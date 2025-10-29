@@ -1,6 +1,15 @@
 use jni::JNIEnv;
 
 use nfscrs::NFSCRSError;
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum NfscrsJniError{
+    #[error("JNIError: {0:?}")]
+    JNIError(#[from] jni::errors::Error),
+    #[error("NFSCRSError: {0:?}")]
+    NFSCRSError(#[from] NFSCRSError)
+}
 
 pub fn throw_nfs_error(env: &mut JNIEnv, err: NFSCRSError) {
     let (class, msg) = match err {

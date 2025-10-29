@@ -1,21 +1,27 @@
-use jni::objects::{JClass, JStaticMethodID, JValue};
 use nfscrs::fattr4::set_bitmap;
 use nfscrs::nfs4_types::{BitMap4, NFSFType4};
 use nfscrs::nfs4_utils::nfs4time_to_miliseconds;
 use nfscrs::nfscrs_types::AbsolutePath;
 use nfscrs::{self, NFSClientBuilder, NFSClientSession};
 
+use jni::objects::{JClass, JStaticMethodID, JValue};
 use jni::JNIEnv;
 use jni::{
     objects::{JObject, JString},
     sys::{jint, jlong, jobject},
 };
 
-use crate::attr_utils::{get_access_time, get_create_time, get_file_mode, get_file_size, get_filetype, get_modify_time};
+use crate::attr_utils::{
+    get_access_time, get_create_time, get_file_mode, get_file_size, get_filetype, get_modify_time,
+};
 use crate::error::throw_nfs_error;
+use crate::file_utils::int_to_open_options;
 
 mod attr_utils;
 mod error;
+mod file_utils;
+mod file_ops;
+mod jni_utils;
 
 #[allow(non_snake_case)]
 #[unsafe(no_mangle)]
@@ -98,8 +104,8 @@ pub extern "system" fn Java_com_algebnaly_nfs4c_NFS4CNativeBridge_listDir(
     };
 
     let session_ptr = session as *mut NFSClientSession;
-    let session_handler: &mut NFSClientSession = unsafe { &mut *session_ptr };
-    let r = match session_handler.list_dir(&abs_path) {
+    let session_ref: &mut NFSClientSession = unsafe { &mut *session_ptr };
+    let r = match session_ref.list_dir(&abs_path) {
         Ok(r) => r,
         Err(e) => {
             let _ = env.throw_new("java/io/IOException", format!("list dir error: {e}"));
@@ -192,14 +198,14 @@ pub extern "system" fn Java_com_algebnaly_nfs4c_NFS4CNativeBridge_readAttr(
         Ok(p) => p,
         Err(e) => {
             let _ = env.throw_new("java/io/IOException", format!("not absolute path: {e}"));
-            return 0 as jobject;
+            return std::ptr::null_mut();
         }
     };
 
     let session_ptr = session as *mut NFSClientSession;
-    let session_handler: &mut NFSClientSession = unsafe { &mut *session_ptr };
+    let session_ref: &mut NFSClientSession = unsafe { &mut *session_ptr };
 
-    let fattr4 = match session_handler.get_attr(&abs_path, basic_attr_bitmap()) {
+    let fattr4 = match session_ref.get_attr(&abs_path, basic_attr_bitmap()) {
         Ok(s) => s,
         Err(e) => {
             crate::error::throw_nfs_error(&mut env, e);
@@ -210,7 +216,7 @@ pub extern "system" fn Java_com_algebnaly_nfs4c_NFS4CNativeBridge_readAttr(
     let filetype = get_filetype(&fattr4, &mut env);
 
     let filesize = get_file_size(&fattr4, &mut env);
-    
+
     let filemode = get_file_mode(&fattr4, &mut env) as i32;
     let access_time = get_access_time(&fattr4, &mut env);
     let access_time_millis: jlong = nfs4time_to_miliseconds(&access_time);
@@ -311,12 +317,13 @@ pub extern "system" fn Java_com_algebnaly_nfs4c_NFS4CNativeBridge_openFile(
     _this: JObject,
     session: jlong,
     path: JString,
-) -> jobject {
+    open_options: jint,
+) -> jlong {
     let path_str: String = match env.get_string(&path) {
         Ok(s) => s.into(),
         Err(e) => {
             let _ = env.throw_new("java/io/IOException", format!("Invalid path: {e}"));
-            return std::ptr::null_mut();
+            return 0;
         }
     };
 
@@ -324,16 +331,28 @@ pub extern "system" fn Java_com_algebnaly_nfs4c_NFS4CNativeBridge_openFile(
         Ok(p) => p,
         Err(e) => {
             let _ = env.throw_new("java/io/IOException", format!("not absolute path: {e}"));
-            return 0 as jobject;
+            return 0;
         }
     };
-    
+
     let session_ptr = session as *mut NFSClientSession;
-    let session_handler: &mut NFSClientSession = unsafe { &mut *session_ptr };
-    
-    session_handler.open(abs_path, open_options)
-    todo!()
+    let session_ref: &mut NFSClientSession = unsafe { &mut *session_ptr };
+
+    let opts = int_to_open_options(open_options);
+
+    let opened_file = match session_ref.open_file_and_comfirm(&abs_path, opts) {
+        Ok(r) => r,
+        Err(e) => {
+            throw_nfs_error(&mut env, e);
+            return 0;
+        }
+    };
+    let file = Box::new(opened_file);
+    let file_ptr = Box::into_raw(file);
+    file_ptr as jlong
 }
+
+
 
 fn basic_attr_bitmap() -> BitMap4 {
     use nfscrs::fattr4::fattr4_names;
