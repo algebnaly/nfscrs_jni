@@ -8,10 +8,12 @@ pub enum NfscrsJniError{
     #[error("JNIError: {0:?}")]
     JNIError(#[from] jni::errors::Error),
     #[error("NFSCRSError: {0:?}")]
-    NFSCRSError(#[from] NFSCRSError)
+    NFSCRSError(#[from] NFSCRSError),
+    #[error("NFSCRSJNIError: {0}")]
+    NFSCRSJNIError(String)
 }
 
-pub fn throw_nfs_error(env: &mut JNIEnv, err: NFSCRSError) {
+pub fn throw_nfs_error(env: &mut JNIEnv, err: &NFSCRSError) {
     let (class, msg) = match err {
         NFSCRSError::Connection(e) =>
             ("java/net/ConnectException", format!("Failed to connect: {e}")),
@@ -34,4 +36,18 @@ pub fn throw_nfs_error(env: &mut JNIEnv, err: NFSCRSError) {
     };
 
     let _ = env.throw_new(class, msg);
+}
+
+pub fn handle_error(env: &mut JNIEnv, e: &NfscrsJniError){
+    match e{
+        NfscrsJniError::JNIError(e) => {
+            let _ = env.throw_new("java/lang/RuntimeException", e.to_string());
+        },
+        NfscrsJniError::NFSCRSError(e) => {
+            throw_nfs_error(env, e);
+        }
+        NfscrsJniError::NFSCRSJNIError(e) => {
+            let _ = env.throw_new("java/lang/RuntimeException", e.to_string());
+        }
+    }
 }

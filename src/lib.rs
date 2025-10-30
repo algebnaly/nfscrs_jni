@@ -14,7 +14,7 @@ use jni::{
 use crate::attr_utils::{
     get_access_time, get_create_time, get_file_mode, get_file_size, get_filetype, get_modify_time,
 };
-use crate::error::throw_nfs_error;
+use crate::error::{handle_error, throw_nfs_error};
 use crate::file_utils::int_to_open_options;
 
 mod attr_utils;
@@ -63,7 +63,7 @@ pub extern "system" fn Java_com_algebnaly_nfs4c_NFS4CNativeBridge_getClientSessi
         match NFSClientBuilder::new(uid as u32, gid as u32, parsed_addr).establish_session() {
             Ok(session) => session,
             Err(e) => {
-                throw_nfs_error(&mut env, e);
+                throw_nfs_error(&mut env, &e);
                 return 0;
             }
         };
@@ -208,14 +208,20 @@ pub extern "system" fn Java_com_algebnaly_nfs4c_NFS4CNativeBridge_readAttr(
     let fattr4 = match session_ref.get_attr(&abs_path, basic_attr_bitmap()) {
         Ok(s) => s,
         Err(e) => {
-            crate::error::throw_nfs_error(&mut env, e);
+            crate::error::throw_nfs_error(&mut env, &e);
             return std::ptr::null_mut();
         }
     };
 
     let filetype = get_filetype(&fattr4, &mut env);
 
-    let filesize = get_file_size(&fattr4, &mut env);
+    let filesize = match get_file_size(&fattr4){
+        Ok(size) => size,
+        Err(e) => {
+            handle_error(&mut env, &e);
+            return std::ptr::null_mut();
+        }
+    };
 
     let filemode = get_file_mode(&fattr4, &mut env) as i32;
     let access_time = get_access_time(&fattr4, &mut env);
@@ -343,7 +349,7 @@ pub extern "system" fn Java_com_algebnaly_nfs4c_NFS4CNativeBridge_openFile(
     let opened_file = match session_ref.open_file_and_comfirm(&abs_path, opts) {
         Ok(r) => r,
         Err(e) => {
-            throw_nfs_error(&mut env, e);
+            throw_nfs_error(&mut env, &e);
             return 0;
         }
     };
