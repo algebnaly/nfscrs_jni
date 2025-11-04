@@ -15,7 +15,6 @@ use crate::attr_utils::{
     get_access_time, get_create_time, get_file_mode, get_file_size, get_filetype, get_modify_time,
 };
 use crate::error::{handle_error, throw_nfs_error};
-use crate::file_utils::int_to_open_options;
 
 mod attr_utils;
 mod error;
@@ -316,47 +315,6 @@ pub extern "system" fn Java_com_algebnaly_nfs4c_NFS4CNativeBridge_readAttr(
     obj.into_raw()
 }
 
-#[allow(non_snake_case)]
-#[unsafe(no_mangle)]
-pub extern "system" fn Java_com_algebnaly_nfs4c_NFS4CNativeBridge_openFile(
-    mut env: JNIEnv,
-    _this: JObject,
-    session: jlong,
-    path: JString,
-    open_options: jint,
-) -> jlong {
-    let path_str: String = match env.get_string(&path) {
-        Ok(s) => s.into(),
-        Err(e) => {
-            let _ = env.throw_new("java/io/IOException", format!("Invalid path: {e}"));
-            return 0;
-        }
-    };
-
-    let abs_path = match AbsolutePath::try_from(path_str) {
-        Ok(p) => p,
-        Err(e) => {
-            let _ = env.throw_new("java/io/IOException", format!("not absolute path: {e}"));
-            return 0;
-        }
-    };
-
-    let session_ptr = session as *mut NFSClientSession;
-    let session_ref: &mut NFSClientSession = unsafe { &mut *session_ptr };
-
-    let opts = int_to_open_options(open_options);
-
-    let opened_file = match session_ref.open_file_and_comfirm(&abs_path, opts) {
-        Ok(r) => r,
-        Err(e) => {
-            throw_nfs_error(&mut env, &e);
-            return 0;
-        }
-    };
-    let file = Box::new(opened_file);
-    let file_ptr = Box::into_raw(file);
-    file_ptr as jlong
-}
 
 
 
