@@ -1,6 +1,6 @@
 use jni::JNIEnv;
 
-use nfscrs::NFSCRSError;
+use nfscrs::nfscrs_error::NFSCRSError;
 use thiserror::Error;
 
 #[derive(Debug, Error)]

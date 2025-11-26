@@ -1,6 +1,7 @@
 use jni::sys::jboolean;
 use nfscrs::nfscrs_types::AbsolutePath;
-use nfscrs::{NFSCRSError, NFSClientSession, OpenOptions, OpenedFile};
+use nfscrs::{NFSClientSession, OpenOptions, OpenedFile};
+use nfscrs::nfscrs_error::NFSCRSError;
 
 use jni::JNIEnv;
 use jni::objects::{JByteArray, JString, JValue};
@@ -239,6 +240,43 @@ fn open_file(
     let file_ptr = Box::into_raw(file);
     Ok(file_ptr as jlong)
 }
+
+#[allow(non_snake_case)]
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_com_algebnaly_nfs4c_NFS4CNativeBridge_mkdir(
+    mut env: JNIEnv,
+    _this: JObject,
+    session: jlong,
+    path: JString,
+    open_options: jint,
+    parents: jboolean,
+    exists_ok: jboolean,
+) {
+    let session_ptr = session as *mut NFSClientSession;
+    let session_ref: &mut NFSClientSession = unsafe { &mut *session_ptr };
+    let opts = int_to_open_options(open_options);
+    match mkdir(session_ref, &mut env, &path, opts, parents, exists_ok) {
+        Ok(r) => r,
+        Err(e) => {
+            handle_error(&mut env, &e);
+        }
+    }
+}
+
+fn mkdir(
+    session_ref: &mut NFSClientSession,
+    env: &mut JNIEnv,
+    path: &JString,
+    _opts: OpenOptions,// TODO: create dir with provided OpenOptions
+    parents: jboolean,
+    exists_ok: jboolean,
+) -> Result<(), NfscrsJniError> {
+    let path_str: String = env.get_string(&path)?.into();
+    let abs_path = AbsolutePath::try_from(path_str).map_err(|e| NFSCRSError::InnerError(e))?;
+    session_ref.mkdir(&abs_path, parents != 0, exists_ok != 0)?;
+    Ok(())
+}
+
 
 #[allow(non_snake_case)]
 #[unsafe(no_mangle)]
