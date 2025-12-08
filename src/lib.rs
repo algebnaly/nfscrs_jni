@@ -1,11 +1,13 @@
+use std::net::ToSocketAddrs;
+
 use nfscrs::fattr4::set_bitmap;
 use nfscrs::nfs4_types::{BitMap4, NFSFType4};
 use nfscrs::nfs4_utils::nfs4time_to_miliseconds;
 use nfscrs::nfscrs_types::AbsolutePath;
 use nfscrs::{self, NFSClientBuilder, NFSClientSession};
 
-use jni::objects::{JClass, JStaticMethodID, JValue};
 use jni::JNIEnv;
+use jni::objects::{JClass, JStaticMethodID, JValue};
 use jni::{
     objects::{JObject, JString},
     sys::{jint, jlong, jobject},
@@ -18,9 +20,19 @@ use crate::error::{handle_error, throw_nfs_error};
 
 mod attr_utils;
 mod error;
-mod file_utils;
 mod file_ops;
+mod file_utils;
 mod jni_utils;
+
+use android_logger;
+use log;
+
+use android_logger::Config;
+use log::LevelFilter;
+
+fn native_activity_create() {
+    android_logger::init_once(Config::default().with_max_level(LevelFilter::Trace));
+}
 
 #[allow(non_snake_case)]
 #[unsafe(no_mangle)]
@@ -31,6 +43,7 @@ pub extern "system" fn Java_com_algebnaly_nfs4c_NFS4CNativeBridge_getClientSessi
     gid: jint,
     remote_addr: JString,
 ) -> jlong {
+    native_activity_create();
     let r_addr_result = match env.get_string(&remote_addr) {
         Ok(s) => s,
         Err(e) => {
@@ -47,7 +60,12 @@ pub extern "system" fn Java_com_algebnaly_nfs4c_NFS4CNativeBridge_getClientSessi
         }
     };
 
-    let parsed_addr = match r_addr.parse() {
+    let parsed_addr = match r_addr.to_socket_addrs().and_then(|mut it| {
+        it.next().ok_or(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "could not resolve to any address", // 自定义错误信息
+        ))
+    }) {
         Ok(addr) => addr,
         Err(e) => {
             let _ = env.throw_new(
@@ -214,7 +232,7 @@ pub extern "system" fn Java_com_algebnaly_nfs4c_NFS4CNativeBridge_readAttr(
 
     let filetype = get_filetype(&fattr4, &mut env);
 
-    let filesize = match get_file_size(&fattr4){
+    let filesize = match get_file_size(&fattr4) {
         Ok(size) => size,
         Err(e) => {
             handle_error(&mut env, &e);
@@ -314,9 +332,6 @@ pub extern "system" fn Java_com_algebnaly_nfs4c_NFS4CNativeBridge_readAttr(
 
     obj.into_raw()
 }
-
-
-
 
 fn basic_attr_bitmap() -> BitMap4 {
     use nfscrs::fattr4::fattr4_names;

@@ -235,7 +235,7 @@ fn open_file(
 ) -> Result<jlong, NfscrsJniError> {
     let path_str: String = env.get_string(&path)?.into();
     let abs_path = AbsolutePath::try_from(path_str).map_err(|e| NFSCRSError::InnerError(e))?;
-    let opened_file = session_ref.open_file_and_comfirm(&abs_path, opts)?;
+    let opened_file = session_ref.open_file(&abs_path, opts)?;
     let file = Box::new(opened_file);
     let file_ptr = Box::into_raw(file);
     Ok(file_ptr as jlong)
