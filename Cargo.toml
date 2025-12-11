@@ -13,3 +13,4 @@ jni = "0.21.1"
 log = "0.4.29"
 nfscrs = {path = "../nfscrs"}
 thiserror = "2.0.12"
+tracing = { version = "0.1.43", features = ["log", "log-always"] }

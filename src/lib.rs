@@ -1,4 +1,5 @@
 use std::net::ToSocketAddrs;
+use std::sync::Once;
 
 use nfscrs::fattr4::set_bitmap;
 use nfscrs::nfs4_types::{BitMap4, NFSFType4};
@@ -44,6 +45,7 @@ pub extern "system" fn Java_com_algebnaly_nfs4c_NFS4CNativeBridge_getClientSessi
     remote_addr: JString,
 ) -> jlong {
     native_activity_create();
+    tracing::debug!("getClientSession!");
     let r_addr_result = match env.get_string(&remote_addr) {
         Ok(s) => s,
         Err(e) => {
