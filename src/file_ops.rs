@@ -47,6 +47,7 @@ fn read_file(
     byte_buffer: &JObject, // ByteBuffer
     env: &mut JNIEnv,
 ) -> Result<jobject, NfscrsJniError> {
+    tracing::debug!("read_file: {:?}", opened_file_ref.path);
     let buf_capacity = env
         .call_method(&byte_buffer, "capacity", "()I", &[])
         .and_then(|v| v.i())?;
@@ -68,6 +69,7 @@ fn read_file(
         &[JValue::Object(&byte_array.into())],
     )?;
 
+    tracing::debug!("read_file ok : {:?}", opened_file_ref.path);
     return Ok(result_obj.into_raw());
 }
 
@@ -101,6 +103,8 @@ fn write_file(
     byte_buffer: &JObject, // ByteBuffer
     env: &mut JNIEnv,
 ) -> Result<jobject, NfscrsJniError> {
+    tracing::debug!("write_file: {:?}", opened_file_ref.path);
+    
     let limit = env
         .call_method(byte_buffer, "limit", "()I", &[])
         .and_then(|v| v.i())?;
@@ -140,6 +144,7 @@ fn write_file(
         &[JValue::from(count as i32)],
     )?;
 
+    tracing::debug!("write_file ok : {:?}", opened_file_ref.path);
     return Ok(result_obj.into_raw());
 }
 
@@ -172,7 +177,9 @@ fn close_file(
     session_ref: &mut NFSClientSession,
     opened_file_ref: &mut OpenedFile,
 ) -> Result<(), NfscrsJniError> {
+    tracing::debug!("close_file: {:?}", opened_file_ref.path);
     session_ref.close(opened_file_ref)?;
+    tracing::debug!("close_file ok : {:?}", opened_file_ref.path);
     Ok(())
 }
 
@@ -189,6 +196,7 @@ pub extern "system" fn Java_com_algebnaly_nfs4c_NFS4CNativeBridge_fileSize(
 
     let opened_file_ptr = opened_file as *mut OpenedFile;
     let opened_file_ref: &mut OpenedFile = unsafe { &mut *opened_file_ptr };
+    tracing::debug!("file_size: {:?}", opened_file_ref.path);
     match get_file_size_from_opened_file(session_ref, opened_file_ref) {
         Ok(r) => r,
         Err(e) => {
@@ -203,6 +211,7 @@ fn get_file_size_from_opened_file(
     opened_file_ref: &mut OpenedFile,
 ) -> Result<i64, NfscrsJniError> {
     let fattr4 = session_ref.get_attr(&opened_file_ref.path, basic_attr_bitmap())?;
+    tracing::debug!("file_size ok : {:?}", opened_file_ref.path);
     crate::attr_utils::get_file_size(&fattr4).map(|size| size as i64)
 }
 
@@ -235,9 +244,11 @@ fn open_file(
 ) -> Result<jlong, NfscrsJniError> {
     let path_str: String = env.get_string(&path)?.into();
     let abs_path = AbsolutePath::try_from(path_str).map_err(|e| NFSCRSError::InnerError(e))?;
+    tracing::debug!("open_file: {:?}", abs_path);
     let opened_file = session_ref.open_file(&abs_path, opts)?;
     let file = Box::new(opened_file);
     let file_ptr = Box::into_raw(file);
+    tracing::debug!("open_file ok : {:?}", abs_path);
     Ok(file_ptr as jlong)
 }
 
@@ -273,7 +284,9 @@ fn mkdir(
 ) -> Result<(), NfscrsJniError> {
     let path_str: String = env.get_string(&path)?.into();
     let abs_path = AbsolutePath::try_from(path_str).map_err(|e| NFSCRSError::InnerError(e))?;
+    tracing::debug!("mkdir: {:?}", abs_path);
     session_ref.mkdir(&abs_path, parents != 0, exists_ok != 0)?;
+    tracing::debug!("mkdir ok : {:?}", abs_path);
     Ok(())
 }
 
@@ -313,5 +326,43 @@ fn set_file_times(
 ) -> Result<jlong, NfscrsJniError> {
     let path_str: String = env.get_string(&path)?.into();
     let _abs_path = AbsolutePath::try_from(path_str).map_err(|e| NFSCRSError::InnerError(e))?;
+    tracing::debug!("set_files_times: {:?}", _abs_path);
     todo!()
 }
+
+#[allow(non_snake_case)]
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_com_algebnaly_nfs4c_NFS4CNativeBridge_delete(
+    mut env: JNIEnv,
+    _this: JObject,
+    session: jlong,
+    path: JString,
+) -> jboolean {
+    let session_ptr = session as *mut NFSClientSession;
+    let session_ref: &mut NFSClientSession = unsafe { &mut *session_ptr };
+    match path_delete(session_ref, &mut env, &path) {
+        Ok(r) => r,
+        Err(e) => {
+            handle_error(&mut env, &e);
+            return 0;
+        }
+    }
+}
+
+fn path_delete(
+    session_ref: &mut NFSClientSession,
+    env: &mut JNIEnv,
+    path: &JString,
+) -> Result<jboolean, NfscrsJniError> {
+    let path_str: String = env.get_string(&path)?.into();
+    let abs_path = AbsolutePath::try_from(path_str).map_err(|e| NFSCRSError::InnerError(e))?;
+    tracing::debug!("path_delete: {:?}", abs_path);
+    
+    todo!()
+    // let opened_file = session_ref.open_file(&abs_path, opts)?;
+    // let file = Box::new(opened_file);
+    // let file_ptr = Box::into_raw(file);
+    // tracing::debug!("open_file ok : {:?}", abs_path);
+    // Ok(file_ptr as jlong)
+}
+
