@@ -24,6 +24,7 @@ pub extern "system" fn Java_com_algebnaly_nfs4c_NFS4CNativeBridge_fileRead(
     _this: JObject,
     session: jlong,
     opened_file: jlong,
+    offset: jlong,
     byte_buffer: JObject,
 ) -> jobject {
     let session_ptr = session as *mut NFSClientSession;
@@ -32,7 +33,7 @@ pub extern "system" fn Java_com_algebnaly_nfs4c_NFS4CNativeBridge_fileRead(
     let opened_file_ptr = opened_file as *mut OpenedFile;
     let opened_file_ref: &mut OpenedFile = unsafe { &mut *opened_file_ptr };
 
-    match read_file(session_ref, opened_file_ref, &byte_buffer, &mut env) {
+    match read_file(session_ref, opened_file_ref, &byte_buffer, offset as usize, &mut env) {
         Ok(r) => r,
         Err(e) => {
             handle_error(&mut env, &e);
@@ -45,13 +46,14 @@ fn read_file(
     session_ref: &mut NFSClientSession,
     opened_file_ref: &mut OpenedFile,
     byte_buffer: &JObject, // ByteBuffer
+    offset: usize,
     env: &mut JNIEnv,
 ) -> Result<jobject, NfscrsJniError> {
     tracing::debug!("read_file: {:?}", opened_file_ref.path);
-    let buf_capacity = env
-        .call_method(&byte_buffer, "capacity", "()I", &[])
+    let buf_remaining = env
+        .call_method(&byte_buffer, "remaining", "()I", &[])
         .and_then(|v| v.i())?;
-    let read_result = session_ref.read(opened_file_ref, buf_capacity as usize)?;
+    let read_result = session_ref.read(opened_file_ref, offset, buf_remaining as usize)?;
     let nfs4_file_read_result_class = env.find_class(NFS4_FILE_READ_RESULT_CLASS_NAME)?;
     let count = read_result.data.len() as jint;
     let result_obj = env.new_object(
@@ -80,6 +82,7 @@ pub extern "system" fn Java_com_algebnaly_nfs4c_NFS4CNativeBridge_fileWrite(
     _this: JObject,
     session: jlong,
     opened_file: jlong,
+    offset: jlong,
     byte_buffer: JObject,
 ) -> jobject {
     let session_ptr = session as *mut NFSClientSession;
@@ -88,7 +91,7 @@ pub extern "system" fn Java_com_algebnaly_nfs4c_NFS4CNativeBridge_fileWrite(
     let opened_file_ptr = opened_file as *mut OpenedFile;
     let opened_file_ref: &mut OpenedFile = unsafe { &mut *opened_file_ptr };
 
-    match write_file(session_ref, opened_file_ref, &byte_buffer, &mut env) {
+    match write_file(session_ref, opened_file_ref, &byte_buffer, offset as usize, &mut env) {
         Ok(r) => r,
         Err(e) => {
             handle_error(&mut env, &e);
@@ -101,6 +104,7 @@ fn write_file(
     session_ref: &mut NFSClientSession,
     opened_file_ref: &mut OpenedFile,
     byte_buffer: &JObject, // ByteBuffer
+    offset: usize,
     env: &mut JNIEnv,
 ) -> Result<jobject, NfscrsJniError> {
     tracing::debug!("write_file: {:?}", opened_file_ref.path);
@@ -134,7 +138,7 @@ fn write_file(
         &slice
     };
 
-    let write_result = session_ref.write(opened_file_ref, slice_ref)?;
+    let write_result = session_ref.write(opened_file_ref, offset, slice_ref)?;
 
     let nfs4_file_write_result_class = env.find_class(NFS4_FILE_WRITE_RESULT_CLASS_NAME)?;
     let count = write_result.count;
@@ -349,6 +353,7 @@ pub extern "system" fn Java_com_algebnaly_nfs4c_NFS4CNativeBridge_delete(
     }
 }
 
+#[allow(unused)]
 fn path_delete(
     session_ref: &mut NFSClientSession,
     env: &mut JNIEnv,

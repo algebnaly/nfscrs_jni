@@ -1,5 +1,4 @@
 use std::net::ToSocketAddrs;
-use std::sync::Once;
 
 use nfscrs::fattr4::set_bitmap;
 use nfscrs::nfs4_types::{BitMap4, NFSFType4};
