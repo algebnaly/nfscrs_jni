@@ -1,7 +1,7 @@
 use jni::sys::jboolean;
+use nfscrs::nfscrs_error::NFSCRSError;
 use nfscrs::nfscrs_types::AbsolutePath;
 use nfscrs::{NFSClientSession, OpenOptions, OpenedFile};
-use nfscrs::nfscrs_error::NFSCRSError;
 
 use jni::JNIEnv;
 use jni::objects::{JByteArray, JString, JValue};
@@ -33,7 +33,13 @@ pub extern "system" fn Java_com_algebnaly_nfs4c_NFS4CNativeBridge_fileRead(
     let opened_file_ptr = opened_file as *mut OpenedFile;
     let opened_file_ref: &mut OpenedFile = unsafe { &mut *opened_file_ptr };
 
-    match read_file(session_ref, opened_file_ref, &byte_buffer, offset as usize, &mut env) {
+    match read_file(
+        session_ref,
+        opened_file_ref,
+        &byte_buffer,
+        offset as usize,
+        &mut env,
+    ) {
         Ok(r) => r,
         Err(e) => {
             handle_error(&mut env, &e);
@@ -91,7 +97,13 @@ pub extern "system" fn Java_com_algebnaly_nfs4c_NFS4CNativeBridge_fileWrite(
     let opened_file_ptr = opened_file as *mut OpenedFile;
     let opened_file_ref: &mut OpenedFile = unsafe { &mut *opened_file_ptr };
 
-    match write_file(session_ref, opened_file_ref, &byte_buffer, offset as usize, &mut env) {
+    match write_file(
+        session_ref,
+        opened_file_ref,
+        &byte_buffer,
+        offset as usize,
+        &mut env,
+    ) {
         Ok(r) => r,
         Err(e) => {
             handle_error(&mut env, &e);
@@ -108,7 +120,7 @@ fn write_file(
     env: &mut JNIEnv,
 ) -> Result<jobject, NfscrsJniError> {
     tracing::debug!("write_file: {:?}", opened_file_ref.path);
-    
+
     let limit = env
         .call_method(byte_buffer, "limit", "()I", &[])
         .and_then(|v| v.i())?;
@@ -282,7 +294,7 @@ fn mkdir(
     session_ref: &mut NFSClientSession,
     env: &mut JNIEnv,
     path: &JString,
-    _opts: OpenOptions,// TODO: create dir with provided OpenOptions
+    _opts: OpenOptions, // TODO: create dir with provided OpenOptions
     parents: jboolean,
     exists_ok: jboolean,
 ) -> Result<(), NfscrsJniError> {
@@ -293,7 +305,6 @@ fn mkdir(
     tracing::debug!("mkdir ok : {:?}", abs_path);
     Ok(())
 }
-
 
 #[allow(non_snake_case)]
 #[unsafe(no_mangle)]
@@ -362,7 +373,7 @@ fn path_delete(
     let path_str: String = env.get_string(&path)?.into();
     let abs_path = AbsolutePath::try_from(path_str).map_err(|e| NFSCRSError::InnerError(e))?;
     tracing::debug!("path_delete: {:?}", abs_path);
-    
+
     todo!()
     // let opened_file = session_ref.open_file(&abs_path, opts)?;
     // let file = Box::new(opened_file);
@@ -370,4 +381,3 @@ fn path_delete(
     // tracing::debug!("open_file ok : {:?}", abs_path);
     // Ok(file_ptr as jlong)
 }
-

@@ -166,17 +166,74 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32a282da65faaf38286cf3be983213fcf1d2e2a58700e808f83f4ea9a4804bc0"
 
 [[package]]
+name = "minibserde"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8d894aa17a62d75796f56d2ce7d857138352f1fc512b110f698bc6923db3fd3d"
+dependencies = [
+ "minibserde-core",
+ "minibserde-derive 0.1.0",
+]
+
+[[package]]
+name = "minibserde"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0042ed31ea1577908c3ae39cd9d3d47c4194c2ebaa3171929bea374eba069b7d"
+dependencies = [
+ "minibserde-core",
+ "minibserde-derive 0.2.0",
+]
+
+[[package]]
+name = "minibserde-core"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "827ca7938aed65190c9a951f863fde11b3a1aea81bfcaaa6bf0ee703ed0711bb"
+
+[[package]]
+name = "minibserde-derive"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c0d239cbb4954dc7a25edb57302785444a2fe1ab516e0d02ea7327521702c054"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "minibserde-derive"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "abf2fb72dc6fa8eb15c6916e38fd22b441d1d9d7755a0fd6b100893d1f3d9f31"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "minibserde_xdr"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d8f8d761540d6fd2b37a34d8dab86156dab5f64d97672108ebc26c0598d5960e"
+dependencies = [
+ "minibserde 0.1.0",
+]
+
+[[package]]
 name = "nfscrs"
 version = "0.2.0"
 dependencies = [
  "dashmap",
+ "minibserde 0.2.0",
+ "minibserde_xdr",
  "onc-rpc",
  "rand",
  "serde",
- "serde_bytes",
  "thiserror 2.0.12",
  "tracing",
- "xdr_brk",
 ]
 
 [[package]]
@@ -349,15 +406,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5f0e2c6ed6606019b4e29e69dbaba95b11854410e5347d525002456dbbb786b6"
 dependencies = [
  "serde_derive",
-]
-
-[[package]]
-name = "serde_bytes"
-version = "0.11.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8437fd221bde2d4ca316d61b90e337e9e702b3820b87d63caa9ba6c02bd06d96"
-dependencies = [
- "serde",
 ]
 
 [[package]]
@@ -646,28 +694,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6f42320e61fe2cfd34354ecb597f86f413484a798ba44a8ca1165c58d42da6c1"
 dependencies = [
  "bitflags",
-]
-
-[[package]]
-name = "xdr_brk"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "064b48dfe9b076f8f656b471b28a6fcb94258918dac0e4103adab2f72d322009"
-dependencies = [
- "serde",
- "xdr_brk_enum",
-]
-
-[[package]]
-name = "xdr_brk_enum"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "872672ee932da9901e3ea9e8ba2ceb93d34cd485e6ec56b1ca3ea17e44023492"
-dependencies = [
- "proc-macro2",
- "quote",
- "serde",
- "syn",
 ]
 
 [[package]]

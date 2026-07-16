@@ -30,8 +30,22 @@ use log;
 use android_logger::Config;
 use log::LevelFilter;
 
-fn native_activity_create() {
-    android_logger::init_once(Config::default().with_max_level(LevelFilter::Trace));
+fn init_android_logger() {
+    android_logger::init_once(
+        Config::default()
+            .with_max_level(LevelFilter::Trace)
+            .with_tag("nfscrs_jni"),
+    );
+}
+
+#[allow(non_snake_case)]
+#[unsafe(no_mangle)]
+pub extern "system" fn JNI_OnLoad(
+    _vm: *mut jni::sys::JavaVM,
+    _reserved: *mut std::ffi::c_void,
+) -> jint {
+    init_android_logger();
+    jni::sys::JNI_VERSION_1_6
 }
 
 #[allow(non_snake_case)]
@@ -42,8 +56,8 @@ pub extern "system" fn Java_com_algebnaly_nfs4c_NFS4CNativeBridge_getClientSessi
     uid: jint,
     gid: jint,
     remote_addr: JString,
+    client_owner: JString, // TODO: pass client_owner from application.
 ) -> jlong {
-    native_activity_create();
     tracing::debug!("getClientSession!");
     let r_addr_result = match env.get_string(&remote_addr) {
         Ok(s) => s,
@@ -77,14 +91,35 @@ pub extern "system" fn Java_com_algebnaly_nfs4c_NFS4CNativeBridge_getClientSessi
         }
     };
 
-    let session =
-        match NFSClientBuilder::new(uid as u32, gid as u32, parsed_addr).establish_session() {
-            Ok(session) => session,
-            Err(e) => {
-                throw_nfs_error(&mut env, &e);
-                return 0;
-            }
-        };
+    let client_owner_string = match env.get_string(&client_owner) {
+        Ok(s) => s,
+        Err(e) => {
+            let _ = env.throw_new("java/io/IOException", format!("Invalid remote_addr: {e}"));
+            return 0;
+        }
+    };
+    let client_owner_str = match client_owner_string.to_str() {
+        Ok(s) => s,
+        Err(e) => {
+            let _ = env.throw_new("java/io/IOException", format!("UTF-8 decode error: {e}"));
+            return 0;
+        }
+    };
+
+    let session = match NFSClientBuilder::new(
+        uid as u32,
+        gid as u32,
+        parsed_addr,
+        client_owner_str.as_bytes().to_owned(),
+    )
+    .establish_session()
+    {
+        Ok(session) => session,
+        Err(e) => {
+            throw_nfs_error(&mut env, &e);
+            return 0;
+        }
+    };
 
     let addr = Box::into_raw(Box::new(session));
     addr as jlong
